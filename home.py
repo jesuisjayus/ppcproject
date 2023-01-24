@@ -14,56 +14,65 @@ def stockManager(prodRate, consRate, stock):
 
     
 def home(keyMsg, keyEng, prodRate, consRate):
-    stock1 = 10
+    pid=os.getpid()
+    stock = 10
+    print("I am ",os.getpid()," and my initial stock home is ",stock)
+    #while True:
+    stock = stockManager(prodRate, consRate, stock)
+    time.sleep(1)
+    mqMsg = sysv_ipc.MessageQueue(keyMsg)
+    mqEng = sysv_ipc.MessageQueue(keyEng)
     while True:
-        stock1 = stockManager(prodRate, consRate, stock1)
+        stock = stockManager(prodRate, consRate, stock)
         time.sleep(1)
-        mqMsg = sysv_ipc.MessageQueue(keyMsg)
-        mqEng = sysv_ipc.MessageQueue(keyEng)
-        m, pid = mqMsg.receive()
-        need = int(m.decode())
-        print(f'{pid} needs {need} \n')
-        if (stock1 - need >= 10):
-            send = str(need).encode()
-            stock1 -= need
-        else:
-            send = str(stock1 - 10).encode()
-            stock1 = 10
-        mqEng.send(send, type=pid)
-        print(f'sending {send.decode()} to {pid} \n')
-        print(f'home : my current stock is {stock1} \n')
+        if stock>10 :
+            stock = donEnergie(stock,mqMsg,mqEng,pid)
+        elif stock<10:
+            stock = demandeEnergie(stock,mqMsg,mqEng,pid)
+        print(f'home {pid} : my current stock is {stock} \n')
 
-def homeBis(keyMsg, keyEng, prodRate, consRate):
-    stock2 = 10
-    while True:
-        stock2 = stockManager(prodRate, consRate, stock2)
-        time.sleep(1)
-        mqMsg = sysv_ipc.MessageQueue(keyMsg)
-        mqEng = sysv_ipc.MessageQueue(keyEng)
-        m = (str(10 - stock2)).encode()
-        mqMsg.send(m, type=os.getpid())
-        print(f'need message sent, pid is {os.getpid()} \n')
-        eng, t = mqEng.receive(type=os.getpid())
-        eng = int(eng.decode())
-        print(f'receiving {eng} \n')
-        stock2 += eng
-        print(f'homeBis : my current stock is {stock2} \n')
+def demandeEnergie(stock, mqMsg, mqEng, pid):
+    m = (str(10 - stock)).encode()
+    mqMsg.send(m, type=pid)
+    print(f'need message sent, pid is {pid} \n')
+    eng, t = mqEng.receive(type=pid)
+    eng = int(eng.decode())
+    print(f'receiving {eng} \n')
+    stock += eng
+    return stock
 
-
-
+def donEnergie(stock, mqMsg, mqEng, pid):
+    pidH=0
+    m, pidH = mqMsg.receive()
+    need = int(m.decode())
+    print(f'{pidH} needs {need} \n')
+    if (stock - need >= 10):
+        send = str(need).encode()
+        stock -= need
+    else:
+        send = str(stock - 10).encode()
+        stock = 10
+    mqEng.send(send, type=pidH)
+    print(f'{pid} is sending {send.decode()} to {pidH} \n')
+    return stock
 
 
 if __name__ == "__main__":
-    keyMsg = 3
-    keyEng = 4
-    mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
-    mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
+    keyMsg = 5
+    keyEng = 6
+    #mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
+    #mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
+    mqMsg = sysv_ipc.MessageQueue(keyMsg)
+    mqEng = sysv_ipc.MessageQueue(keyEng)
     h = Process(target=home, args=(keyMsg, keyEng, 2, 1, ))
-    h1 = Process(target=homeBis, args=(keyMsg, keyEng, 1, 2, ))
+    h1 = Process(target=home, args=(keyMsg, keyEng, 1, 2, ))
+    h2 = Process(target=home, args=(keyMsg, keyEng, 1, 2, ))
     h.start()
     h1.start()
+    h2.start()
     h.join()
     h1.join()
+    h2.join()
     mqMsg.remove()
     mqEng.remove()
 
