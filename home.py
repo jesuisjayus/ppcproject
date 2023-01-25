@@ -16,7 +16,7 @@ def stockManager(prodRate, consRate, stock):
 def home(keyMsg, keyEng, prodRate, consRate):
     pid=os.getpid()
     stock = 10
-    print("I am ",os.getpid()," and my initial stock home is ",stock)
+    print("I am ",pid," and my initial stock home is ",stock)
     #while True:
     stock = stockManager(prodRate, consRate, stock)
     time.sleep(1)
@@ -60,10 +60,10 @@ def donEnergie(stock, mqMsg, mqEng, pid):
 if __name__ == "__main__":
     keyMsg = 5
     keyEng = 6
-    #mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
-    #mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
-    mqMsg = sysv_ipc.MessageQueue(keyMsg)
-    mqEng = sysv_ipc.MessageQueue(keyEng)
+    mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
+    mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
+    #mqMsg = sysv_ipc.MessageQueue(keyMsg)
+    #mqEng = sysv_ipc.MessageQueue(keyEng)
     h = Process(target=home, args=(keyMsg, keyEng, 2, 1, ))
     h1 = Process(target=home, args=(keyMsg, keyEng, 1, 2, ))
     h2 = Process(target=home, args=(keyMsg, keyEng, 1, 2, ))
