@@ -23,7 +23,7 @@ def stockManager(prodRate, consRate, stock):
 def home(keyMsg, keyEng, prodRate, consRate):
     pid = os.getpid()
     stock = 10
-    print(f'I am {pid} and my initial stock home is {stock}')
+    print(f'| I am home {pid} and my initial stock is {stock} kWh |')
     # while True:
     # stock = stockManager(prodRate, consRate, stock)
     # time.sleep(5)
@@ -38,7 +38,7 @@ def home(keyMsg, keyEng, prodRate, consRate):
             stock = demandeEnergie(stock, mqMsg, mqEng, pid)
         else:
             pass
-        print(f'home {pid} : my current stock is {stock} \n')
+        print(f'Home {pid} : current stock is {stock} kWh')
 
 
 def demandeEnergie(stock, mqMsg, mqEng, pid):
@@ -64,27 +64,32 @@ def donEnergie(stock, mqMsg, mqEng, pid):
         send = str(stock - 10).encode()
         stock = 10
     mqEng.send(send, type=pidH)
-    print(f'{pid} is sending {send.decode()} to {pidH} \n')
+    print(f'Home {pid} :  is sending {send.decode()} to home {pidH}')
     return stock
 
 def handler(sig, frame):
     global endWorld, trumpElection, fuelShortage
     if sig == signal.SIGUSR1:
         print("fin du monde")
+        print("--------------------------------------------------")
         endWorld = 1
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
             print("Start of Trump election")
+            print("--------------------------------------------------")
             trumpElection = 1
         else:
             print("End of Trump election")
+            print("--------------------------------------------------")
             trumpElection = 0
     elif sig == signal.SIGALRM:
         if fuelShortage == 0:
             print("Start of fuel shortage")
+            print("--------------------------------------------------")
             fuelShortage = 1
         else:
             print("End of fuel shortage")
+            print("--------------------------------------------------")
             fuelShortage = 0
 
 
@@ -101,11 +106,11 @@ def external():
             sig = signal.SIGALRM
             os.kill(os.getppid(), sig)
         else:
-            pass
+            print("--------------------------------------------------")
         time.sleep(5)
 
 
-def priceCalcul(prix, mem):
+def priceCalcul(price, mem):
     global endWorld, trumpElection, fuelShortage
     a = 0.00003
     b1 = 0.05
@@ -113,12 +118,14 @@ def priceCalcul(prix, mem):
     b3 = 0.005
     g = 0.99
     t = mem.value
-    prix = g * prix + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
-    print(f'le prix est de {prix:.4f}')
-    return prix
+    price = g * price + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
+    print(f'Current price {price:.4f} €/kWh')
+    return price
 
 
 def weather(mem):
+    print(f'|          Initial temperature : {mem.value} °C           |')
+    print("¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯")
     while True:
         r = random.randint(-1, 1)
         match r:
@@ -135,6 +142,7 @@ def weather(mem):
 
 def market(mem):
     price = 0.1740
+    print(f'|          Initial price : {price} €/kWh           |')
     externalProcess = Process(target=external)
     externalProcess.start()
     signal.signal(signal.SIGUSR1, handler)
@@ -148,9 +156,10 @@ def market(mem):
 
 
 if __name__ == "__main__":
+    print("__________________________________________________")
     shared_memory = Value('I', 18)
-    keyMsg = 102
-    keyEng = 203
+    keyMsg = 112
+    keyEng = 212
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     # mqMsg = sysv_ipc.MessageQueue(keyMsg)
