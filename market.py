@@ -8,7 +8,7 @@ import select
 
 
 global PORT
-PORT = 6667
+PORT = 6666
 
 
 
@@ -17,7 +17,7 @@ def fakeHome(s):
     global PORT
     stockHome = s
     pid = os.getpid()
-    print(f"my pid is {pid} and my stock is {stockHome}")
+    print(f'my pid is {pid} and my stock is {stockHome}')
     if stockHome < 10:
         typeTransac = 1 #needs
     else:
@@ -32,7 +32,7 @@ def fakeHome(s):
             stockHome += int(purchase[1])
         elif typeTransac == 2:
             stockHome -= int(purchase[1])
-        print(f"{pid} my new stock is {stockHome}")
+        print(f'{pid} my new stock is {stockHome}')
 
 
 
@@ -42,29 +42,34 @@ def external():
 
 def transaction(home_socket, address, stock, mutex):
     with home_socket:
-        print("Connected to home: ", address)
+        print(f'Connected to home: {address}')
         data = home_socket.recv(1024)
         data = data.decode().split()
         [typeTransac, pid, qty] = data
         qty = int(qty)
-        print(f"transac {typeTransac}")
-        #mutex.aquire()
+        print(f'transac {typeTransac}')
         if typeTransac == "1":
             if qty <= stock:
-                sale = f"{pid} {qty}"
+                mutex.aquire()
+                sale = f'{pid} {qty}'
                 stock -= qty
                 home_socket.sendto(sale.encode(), address)
+                mutex.release()
             else:
-                sale = f"{pid} {stock}"
+                mutex.aquire()
+                sale = f'{pid} {stock}'
                 stock = 0
                 home_socket.sendto(sale.encode(), address)
+                mutex.release()
         elif typeTransac == "2":
+            mutex.aquire()
             stock += qty
-            purchase = f"{pid} {qty}"
-            print(f"p : {purchase}")
+            purchase = f'{pid} {qty}'
+            print(f'p : {purchase}')
             home_socket.sendto(purchase.encode(), address)
+            mutex.release()
         # else pour gestion d'erreur
-        #mutex.release()
+
         return stock
 
 
@@ -93,10 +98,10 @@ if __name__ == "__main__":
     mutex = Lock()
     marketProcess = Process(target=market, args=(mutex,))
     home = Process(target=fakeHome, args=(12,))
-    #home2 = Process(target=fakeHome, args=(12,))
+    home2 = Process(target=fakeHome, args=(8,))
     marketProcess.start()
     home.start()
-    #home2.start()
+    home2.start()
     marketProcess.join()
     home.join()
-    #home2.join()
+    home2.join()

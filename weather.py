@@ -16,10 +16,10 @@ def weather(mem):
             case 1:
                 if(mem.value < 35):
                     mem.value += r
-        print("Current temperature : ", mem.value, "°C")
+        print(f'Current temperature : {mem.value} °C')
         t = mem.value
         prix = b*prix + a*(t*t-40*t+375)
-        print(f"le prix est de {prix}")
+        print(f'le prix est de {prix}')
         time.sleep(0.5)
 
 
