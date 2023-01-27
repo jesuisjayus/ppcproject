@@ -9,6 +9,7 @@ import time
 import sysv_ipc
 import concurrent.futures
 import select
+from tkinter import *
 
 global endWorld, trumpElection, fuelShortage
 endWorld, trumpElection, fuelShortage = 0, 0, 0
@@ -20,9 +21,9 @@ def stockManager(prodRate, consRate, stock):
     return stock
 
 
-def home(keyMsg, keyEng, prodRate, consRate):
+def home(keyMsg, keyEng, s, prodRate, consRate):
     pid = os.getpid()
-    stock = 10
+    stock = s
     print(f'| I am home {pid} and my initial stock is {stock} kWh |')
     # while True:
     # stock = stockManager(prodRate, consRate, stock)
@@ -110,37 +111,37 @@ def external():
         time.sleep(5)
 
 
-def priceCalcul(price, mem):
+def priceCalcul(price, temp):
     global endWorld, trumpElection, fuelShortage
     a = 0.00003
     b1 = 0.05
     b2 = 0.005
     b3 = 0.005
     g = 0.99
-    t = mem.value
+    t = temp.value
     price = g * price + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
     print(f'Current price {price:.4f} €/kWh')
     return price
 
 
-def weather(mem):
-    print(f'|          Initial temperature : {mem.value} °C           |')
+def weather(temp):
+    print(f'|          Initial temperature : {temp.value} °C           |')
     print("¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯")
     while True:
         r = random.randint(-1, 1)
         match r:
             case -1:
-                if(mem.value > 0):
-                    mem.value += r
+                if temp.value > 0:
+                    temp.value += r
             case 1:
-                if(mem.value < 35):
-                    mem.value += r
-        print(f'Current temperature : {mem.value} °C')
+                if temp.value < 35:
+                    temp.value += r
+        print(f'Current temperature : {temp.value} °C')
         time.sleep(5)
 
 
 
-def market(mem):
+def market(temp):
     price = 0.1740
     print(f'|          Initial price : {price} €/kWh           |')
     externalProcess = Process(target=external)
@@ -149,26 +150,27 @@ def market(mem):
     signal.signal(signal.SIGUSR2, handler)
     signal.signal(signal.SIGALRM, handler)
     while True:
-        price = priceCalcul(price, mem)
+        price = priceCalcul(price, temp)
         time.sleep(5)
     externalProcess.join()
 
 
 
+
 if __name__ == "__main__":
     print("__________________________________________________")
-    shared_memory = Value('I', 18)
-    keyMsg = 112
-    keyEng = 212
-    mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
-    mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
-    # mqMsg = sysv_ipc.MessageQueue(keyMsg)
-    # mqEng = sysv_ipc.MessageQueue(keyEng)
-    h = Process(target=home, args=(keyMsg, keyEng, 2, 1,))
-    h1 = Process(target=home, args=(keyMsg, keyEng, 1, 2,))
-    h2 = Process(target=home, args=(keyMsg, keyEng, 2, 1,))
-    marketProcess = Process(target=market, args=(shared_memory,))
-    weatherProcess = Process(target=weather, args=(shared_memory,))
+    initTemp = Value('I', 18)
+    keyMsg = 33
+    keyEng = 43
+    #mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
+    #mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
+    mqMsg = sysv_ipc.MessageQueue(keyMsg)
+    mqEng = sysv_ipc.MessageQueue(keyEng)
+    h = Process(target=home, args=(keyMsg, keyEng, 10, 2, 1,))
+    h1 = Process(target=home, args=(keyMsg, keyEng, 10, 1, 2,))
+    h2 = Process(target=home, args=(keyMsg, keyEng, 10, 2, 1,))
+    marketProcess = Process(target=market, args=(initTemp,))
+    weatherProcess = Process(target=weather, args=(initTemp,))
     h.start()
     h1.start()
     h2.start()
