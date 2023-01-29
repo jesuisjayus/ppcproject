@@ -9,10 +9,13 @@ import time
 import sysv_ipc
 import concurrent.futures
 import select
-from tkinter import *
+import tkinter as tk
 
-global endWorld, trumpElection, fuelShortage
+
 endWorld, trumpElection, fuelShortage = 0, 0, 0
+initTemp = 18
+initPrice = 0.1740
+delay = 5000
 
 
 def stockManager(prodRate, consRate, stock):
@@ -119,9 +122,10 @@ def priceCalcul(price, temp):
     b3 = 0.005
     g = 0.99
     t = temp.value
-    price = g * price + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
-    print(f'Current price {price:.4f} €/kWh')
-    return price
+    p = price.value
+    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
+    print(f'Current price {price.value:.4f} €/kWh')
+
 
 
 def weather(temp):
@@ -141,8 +145,7 @@ def weather(temp):
 
 
 
-def market(temp):
-    price = 0.1740
+def market(temp, price):
     print(f'|          Initial price : {price} €/kWh           |')
     externalProcess = Process(target=external)
     externalProcess.start()
@@ -150,7 +153,7 @@ def market(temp):
     signal.signal(signal.SIGUSR2, handler)
     signal.signal(signal.SIGALRM, handler)
     while True:
-        price = priceCalcul(price, temp)
+        priceCalcul(price, temp)
         time.sleep(5)
     externalProcess.join()
 
@@ -159,23 +162,64 @@ def market(temp):
 
 if __name__ == "__main__":
     print("__________________________________________________")
-    initTemp = Value('I', 18)
-    keyMsg = 33
-    keyEng = 43
-    #mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
-    #mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
-    mqMsg = sysv_ipc.MessageQueue(keyMsg)
-    mqEng = sysv_ipc.MessageQueue(keyEng)
+
+    sharedTemp = Value('I', initTemp)
+    sharedPrice = Value('f', initPrice)
+    temp = initTemp
+    price = initPrice
+
+    displayTemp = tk.Tk()
+    displayTemp.title("Display Temperature")
+    displayTemp.geometry('300x200+660+320')
+    labelTemp = tk.Label(displayTemp, text=f'\n\nInitial temperature : \n\n{temp} °C')
+    labelTemp.config(font=('verdana', 12))
+    labelTemp.pack()
+
+    displayPrice = tk.Tk()
+    displayPrice.title("Display Price")
+    displayPrice.geometry('300x200+960+320')
+    labelPrice = tk.Label(displayPrice, text=f'\n\nInitial price : \n\n{price:.4f} €/kWh')
+    labelPrice.config(font=('verdana', 12))
+    labelPrice.pack()
+
+    keyMsg = 51
+    keyEng = 61
+    mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
+    mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
+    #mqMsg = sysv_ipc.MessageQueue(keyMsg)
+    #mqEng = sysv_ipc.MessageQueue(keyEng)
     h = Process(target=home, args=(keyMsg, keyEng, 10, 2, 1,))
     h1 = Process(target=home, args=(keyMsg, keyEng, 10, 1, 2,))
     h2 = Process(target=home, args=(keyMsg, keyEng, 10, 2, 1,))
-    marketProcess = Process(target=market, args=(initTemp,))
-    weatherProcess = Process(target=weather, args=(initTemp,))
+    marketProcess = Process(target=market, args=(sharedTemp, sharedPrice,))
+    weatherProcess = Process(target=weather, args=(sharedTemp,))
     h.start()
     h1.start()
     h2.start()
     marketProcess.start()
     weatherProcess.start()
+
+    def update_temp():
+        temp = sharedTemp.value
+        labelTemp.config(text=f'\n\nCurrent temperature : \n\n{temp} °C')
+        if temp >= 25:
+            labelTemp.config(fg="red")
+        elif temp <= 10:
+            labelTemp.config(fg="blue")
+        else:
+            labelTemp.config(fg="green")
+        displayTemp.after(delay, update_temp)
+
+    def update_price():
+        price = sharedPrice.value
+        labelPrice.config(text=f'\n\nCurrent price : \n\n{price:.4f} €/kWh')
+        displayPrice.after(delay, update_price)
+
+
+    update_temp()
+    update_price()
+    displayTemp.mainloop()
+    displayPrice.mainloop()
     h.join()
     h1.join()
     h2.join()
