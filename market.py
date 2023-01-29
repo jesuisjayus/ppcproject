@@ -9,7 +9,7 @@ import time
 
 
 serv = True
-PORT = 6667
+PORT = 6690
 stock = 0
 HOST = "localhost"
 
@@ -85,12 +85,16 @@ def market(mutex):
     price = 0.1740
     global PORT
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as market_socket:
+        print("niveau1\n")
         market_socket.bind((HOST, PORT))
         market_socket.listen(8)
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            print("niveau2\n")
             while serv:
+                print("niveau3\n")
                 readable, writable, error = select.select([market_socket], [], [], 1)
                 if market_socket in readable:
+                    print("niveau4\n")
                     home_socket, address = market_socket.accept()
                     executor.submit(MarketTransaction, home_socket, address, mutex)
 
@@ -104,9 +108,9 @@ def market(mutex):
 
 if __name__ == "__main__":
     mutex = threading.Lock()
-    home = Process(target=fakeHome, args=(8,))
-    home2 = Process(target=fakeHome, args=(12,))
-    home3 = Process(target=fakeHome, args=(15,))
+    home = Process(target=fakeHome, args=(10,))
+    home2 = Process(target=fakeHome, args=(10,))
+    home3 = Process(target=fakeHome, args=(10,))
     home.start()
     home2.start()
     home3.start()
