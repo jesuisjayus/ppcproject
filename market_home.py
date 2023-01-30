@@ -11,7 +11,7 @@ import tkinter as tk
 from multiprocessing import Process, Value, Lock
 
 serv = True
-PORT = 7606
+PORT = 7607
 initStock = 3
 HOST = "localhost"
 worldWar, trumpElection, fuelShortage = 0, 0, 0
@@ -182,6 +182,14 @@ def handler(sig, frame):
             print("End of fuel shortage")
             print("--------------------------------------------------")
             fuelShortage = 0
+
+def handlerC(sig, frame):
+    print('CTRL+C was pressed. Exit program')
+    mqEng.remove()
+    mqMsg.remove()
+    displayMarket.destroy()
+    displayTemp.destroy()
+
 def weather(temp):
     print(f'|          Initial temperature : {temp.value} °C           |')
     print("¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯")
@@ -236,7 +244,7 @@ def market(mutex, temp, price, stock):
                     home_socket, address = market_socket.accept()
                     executor.submit(MarketTransaction, home_socket, address, mutex, price, temp, stock)
     externalProcess.join()
-def MarketTransaction(home_socket, address, mutex, price, temp, stock):
+def MarketTransaction(home_socket, address, mutex, stock):
     with home_socket:
         #print(f'Connected to home: {address}')
         data = home_socket.recv(1024)
@@ -271,6 +279,8 @@ def MarketTransaction(home_socket, address, mutex, price, temp, stock):
 if __name__ == "__main__":
     print("__________________________________________________")
 
+    signal.signal(signal.SIGINT, handlerC)
+
     sharedTemp = Value('I', initTemp)
     sharedPrice = Value('f', initPrice)
     sharedStock = Value('I', initStock)
@@ -297,8 +307,8 @@ if __name__ == "__main__":
     temp = initTemp
     price = initPrice
     mutex = threading.Lock()
-    keyMsg = 169
-    keyEng = 269
+    keyMsg = 170
+    keyEng = 270
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     #mqMsg = sysv_ipc.MessageQueue(keyMsg)
@@ -310,7 +320,7 @@ if __name__ == "__main__":
     marketProcess = Process(target=market, args=(mutex, sharedTemp, sharedPrice, sharedStock,))
     weatherProcess.start()
     marketProcess.start()
-    time.sleep(0.1)
+    time.sleep(0.5)
 
     home1.start()
     home2.start()
