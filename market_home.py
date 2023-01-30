@@ -6,6 +6,7 @@ import signal
 import socket
 import sysv_ipc
 import time
+import math
 import tkinter as tk
 from threading import Lock
 from multiprocessing import Process, Value
@@ -15,7 +16,7 @@ PORT = 6666
 HOST = "localhost"
 worldWar, trumpElection, fuelShortage = 0, 0, 0
 initStock = 15
-initTemp = 18
+initTemp = 18.0
 initPrice = 0.1740
 delay = 1000
 threshold = 30
@@ -189,19 +190,15 @@ def handlerC(sig, frame):
 
 
 def weather(temp):
+    t = 0
     mutex = Lock()
     while True:
-        r = random.randint(-1, 1)
         mutex.acquire()
-        match r:
-            case -1:
-                if temp.value > 0:
-                    temp.value += r
-            case 1:
-                if temp.value < 35:
-                    temp.value += r
+        temp.value = -15 * math.sin((math.pi*t/12) + math.pi/6) + 15 + random.randint(-10, 10)/10
         mutex.release()
+        t += 1
         time.sleep(delay/1000)
+
 def priceCalcul(price, temp):
     mutex = Lock()
     global worldWar, trumpElection, fuelShortage
@@ -270,7 +267,7 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, handlerC)
 
-    sharedTemp = Value('I', initTemp)
+    sharedTemp = Value('f', initTemp)
     sharedPrice = Value('f', initPrice)
     sharedStock = Value('I', initStock)
     temp = initTemp
@@ -280,7 +277,7 @@ if __name__ == "__main__":
     displayTemp = tk.Tk()
     displayTemp.title("Temperature")
     displayTemp.geometry('300x200+660+320')
-    labelTemp = tk.Label(displayTemp, text=f'\n\nInitial temperature : \n\n{temp} °C')
+    labelTemp = tk.Label(displayTemp, text=f'\n\nInitial temperature : \n\n{temp:.1f} °C')
     labelTemp.config(font=('verdana', 12))
     labelTemp.pack()
 
@@ -290,11 +287,6 @@ if __name__ == "__main__":
     labelMarket = tk.Label(displayMarket, text=f'\nInitial price : \n\n{price:.4f} €/kWh\n\n Market Stock : {stock} kWh')
     labelMarket.config(font=('verdana', 12))
     labelMarket.pack()
-
-    sharedTemp = Value('I', initTemp)
-    sharedPrice = Value('f', initPrice)
-    temp = initTemp
-    price = initPrice
 
     keyMsg = 170
     keyEng = 270
@@ -319,7 +311,7 @@ if __name__ == "__main__":
 
     def update_temp():
         temp = sharedTemp.value
-        labelTemp.config(text=f'\n\nCurrent temperature : \n\n{temp} °C')
+        labelTemp.config(text=f'\n\nCurrent temperature : \n\n{temp:.1f} °C')
         if temp >= 25:
             labelTemp.config(fg="red")
         elif temp <= 10:
