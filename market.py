@@ -108,9 +108,9 @@ def market(mutex):
 
 if __name__ == "__main__":
     mutex = threading.Lock()
-    home = Process(target=fakeHome, args=(10,))
+    home = Process(target=fakeHome, args=(12,))
     home2 = Process(target=fakeHome, args=(10,))
-    home3 = Process(target=fakeHome, args=(10,))
+    home3 = Process(target=fakeHome, args=(8,))
     home.start()
     home2.start()
     home3.start()

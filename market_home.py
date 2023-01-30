@@ -15,7 +15,7 @@ import tkinter as tk
 
 
 serv = True
-PORT = 7601
+PORT = 7604
 stock = 0
 HOST = "localhost"
 worldWar, trumpElection, fuelShortage = 0, 0, 0
@@ -43,13 +43,17 @@ def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente s
         match policy:
             case 1:
                 stockHome = donEnergie(stockHome, mqMsg, mqEng, pid)
+                print(f'my pid is {pid} and my new stock is {stockHome}')
             case 2:
                 typeTransac = 2 #surplus
                 stockHome=homeSelling(typeTransac, pid, stockHome)
+                print(f'my pid is {pid} and my new stock is {stockHome}')
             case 3:
                 stockHome=debarras(stockHome, mqMsg, mqEng, pid)
+                print(f'my pid is {pid} and my new stock is {stockHome}')
     elif stockHome<10 :
         stockHome=homeRestock(stockHome, pid, mqMsg, mqEng)
+        print(f'my pid is {pid} and my new stock is {stockHome}')
     else:
         pass
     return stockHome
@@ -112,7 +116,8 @@ def homeRestock (stockHome, pid, mqMsg, mqEng): #envoi dans mqMsg pk besoin si q
     except sysv_ipc.BusyError:
         #print("hello3\n")
         typeTransac=1
-        stockHome=homeBuying(typeTransac, pid, stockHome)
+        print("j'achete")
+        #stockHome=homeBuying(typeTransac, pid, stockHome)
     return stockHome
     
 """ def demandeEnergie(stockHome, mqMsg, mqEng, pid):
@@ -270,9 +275,14 @@ def MarketTransaction(home_socket, address, mutex, price, temp):
 def handler(sig, frame):
     global worldWar, trumpElection, fuelShortage
     if sig == signal.SIGUSR1:
-        print("fin du monde")
-        print("--------------------------------------------------")
-        worldWar = 1
+        if worldWar == 0:
+            print("World war")
+            print("--------------------------------------------------")
+            worldWar = 1
+        else:
+            print("End of world war")
+            print("--------------------------------------------------")
+            worldWar = 0
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
             print("Start of Trump election")
@@ -301,6 +311,7 @@ def market(mutex, temp, price):
     signal.signal(signal.SIGALRM, handler)
     global PORT
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as market_socket:
+        market_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         market_socket.bind((HOST, PORT))
         market_socket.listen(8)
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -369,19 +380,21 @@ if __name__ == "__main__":
     temp = initTemp
     price = initPrice
     mutex = threading.Lock()
-    keyMsg = 125
-    keyEng = 225
+    keyMsg = 149
+    keyEng = 249
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     #mqMsg = sysv_ipc.MessageQueue(keyMsg)
     #mqEng = sysv_ipc.MessageQueue(keyEng)
-    home1 = Process(target=home, args=(7, 2, keyMsg, keyEng, 1, 1))
-    home2 = Process(target=home, args=(11, 1, keyMsg, keyEng, 1, 1))
-    home3 = Process(target=home, args=(12, 1, keyMsg, keyEng, 1, 1))
+    home1 = Process(target=home, args=(11, 1, keyMsg, keyEng, 1, 1))
+    home2 = Process(target=home, args=(12, 1, keyMsg, keyEng, 1, 1))
+    home3 = Process(target=home, args=(7, 1, keyMsg, keyEng, 1, 1))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
     marketProcess = Process(target=market, args=(mutex, sharedTemp, sharedPrice,))
     weatherProcess.start()
     marketProcess.start()
+    time.sleep(1)
+
     home1.start()
     home2.start()
     home3.start()
