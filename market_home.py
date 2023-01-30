@@ -15,10 +15,10 @@ import tkinter as tk
 
 
 serv = True
-PORT = 6667
+PORT = 7601
 stock = 0
 HOST = "localhost"
-endWorld, trumpElection, fuelShortage = 0, 0, 0
+worldWar, trumpElection, fuelShortage = 0, 0, 0
 initTemp = 18
 initPrice = 0.1740
 delay = 1000
@@ -36,7 +36,7 @@ def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
         stockHome=stockManager(prodRate, consRate, stockHome);
         stockHome=tradePolicy(tradePol, stockHome, pid, mqMsg, mqEng)
         time.sleep(delay/1000)
-        print(f'my pid is {pid} and my stock is {stockHome}')
+        #print(f'my pid is {pid} and my stock is {stockHome}')
 
 def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente si personne a qui donner
     if stockHome>10:
@@ -110,7 +110,7 @@ def homeRestock (stockHome, pid, mqMsg, mqEng): #envoi dans mqMsg pk besoin si q
         #print(f'{pid} receiving {eng} \n')
         stockHome += eng
     except sysv_ipc.BusyError:
-        print("hello3\n")
+        #print("hello3\n")
         typeTransac=1
         stockHome=homeBuying(typeTransac, pid, stockHome)
     return stockHome
@@ -131,7 +131,7 @@ def homeRestock (stockHome, pid, mqMsg, mqEng): #envoi dans mqMsg pk besoin si q
 def donEnergie(stockHome, mqMsg, mqEng, pid):
     pidH=0
     try:
-        print("hello")
+        #print("hello")
         m, pidH = mqMsg.receive(block=False)
         need = int(m.decode())
         #print(f'{pidH} needs {need} \n')
@@ -142,7 +142,7 @@ def donEnergie(stockHome, mqMsg, mqEng, pid):
             send = str(stockHome - 10).encode()
             stockHome = 10
         mqEng.send(send, type=pidH)
-        print("hello")
+        #print("hello")
         print(f'{pid} is sending {send.decode()} to {pidH} \n')
     except sysv_ipc.BusyError:
         print("personne ne veut mon energie, miskina")
@@ -195,7 +195,7 @@ def homeBuying(typeTransac, pid, stockHome):
 
 def external():
     while True:
-        r = random.randint(0, 10)
+        r = random.randint(0, 20)
         match r:
             case 0:
                 sig = signal.SIGUSR1
@@ -221,11 +221,11 @@ def weather(temp):
             case 1:
                 if temp.value < 35:
                     temp.value += r
-        print(f'Current temperature : {temp.value} °C')
+        #print(f'Current temperature : {temp.value} °C')
         time.sleep(delay/1000)
 
 def priceCalcul(price, temp):
-    global endWorld, trumpElection, fuelShortage
+    global worldWar, trumpElection, fuelShortage
     a = 0.00003
     b1 = 0.05
     b2 = 0.005
@@ -233,7 +233,7 @@ def priceCalcul(price, temp):
     g = 0.99
     t = temp.value
     p = price.value
-    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
+    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * worldWar + b2 * trumpElection + b3 * fuelShortage
     print(f'Current price {price.value:.4f} €/kWh')
 
 def MarketTransaction(home_socket, address, mutex, price, temp):
@@ -268,11 +268,11 @@ def MarketTransaction(home_socket, address, mutex, price, temp):
             mutex.release()
 
 def handler(sig, frame):
-    global endWorld, trumpElection, fuelShortage
+    global worldWar, trumpElection, fuelShortage
     if sig == signal.SIGUSR1:
         print("fin du monde")
         print("--------------------------------------------------")
-        endWorld = 1
+        worldWar = 1
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
             print("Start of Trump election")
@@ -313,7 +313,8 @@ def market(mutex, temp, price):
     externalProcess.join()
 
 def priceCalcul(price, temp):
-    global endWorld, trumpElection, fuelShortage
+    mutex = Lock()
+    global worldWar, trumpElection, fuelShortage
     a = 0.00003
     b1 = 0.05
     b2 = 0.005
@@ -321,8 +322,10 @@ def priceCalcul(price, temp):
     g = 0.99
     t = temp.value
     p = price.value
-    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
-    print(f'Current price {price.value:.4f} €/kWh')
+    mutex.acquire()
+    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * worldWar + b2 * trumpElection + b3 * fuelShortage
+    mutex.release()
+    #print(f'Current price {price.value:.4f} €/kWh')
 
     #externalProcess = Process(target=external)
     #externalProcess.start()
@@ -366,15 +369,15 @@ if __name__ == "__main__":
     temp = initTemp
     price = initPrice
     mutex = threading.Lock()
-    keyMsg = 119
-    keyEng = 219
+    keyMsg = 125
+    keyEng = 225
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     #mqMsg = sysv_ipc.MessageQueue(keyMsg)
     #mqEng = sysv_ipc.MessageQueue(keyEng)
-    home1 = Process(target=home, args=(10, 2, keyMsg, keyEng, 1, 1))
-    home2 = Process(target=home, args=(10, 1, keyMsg, keyEng, 1, 1))
-    home3 = Process(target=home, args=(13, 1, keyMsg, keyEng, 2, 1))
+    home1 = Process(target=home, args=(7, 2, keyMsg, keyEng, 1, 1))
+    home2 = Process(target=home, args=(11, 1, keyMsg, keyEng, 1, 1))
+    home3 = Process(target=home, args=(12, 1, keyMsg, keyEng, 1, 1))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
     marketProcess = Process(target=market, args=(mutex, sharedTemp, sharedPrice,))
     weatherProcess.start()
