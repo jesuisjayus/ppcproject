@@ -10,9 +10,10 @@ import sysv_ipc
 import concurrent.futures
 import select
 import tkinter as tk
+from multiprocessing import Lock
 
 
-endWorld, trumpElection, fuelShortage = 0, 0, 0
+worldWar, trumpElection, fuelShortage = 0, 0, 0
 initTemp = 18
 initPrice = 0.1740
 delay = 5000
@@ -72,11 +73,16 @@ def donEnergie(stock, mqMsg, mqEng, pid):
     return stock
 
 def handler(sig, frame):
-    global endWorld, trumpElection, fuelShortage
+    global worldWar, trumpElection, fuelShortage
     if sig == signal.SIGUSR1:
-        print("fin du monde")
-        print("--------------------------------------------------")
-        endWorld = 1
+        if worldWar == 0:
+            print("World war")
+            print("--------------------------------------------------")
+            worldWar = 1
+        else:
+            print("End of world war")
+            print("--------------------------------------------------")
+            worldWar = 0
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
             print("Start of Trump election")
@@ -97,6 +103,7 @@ def handler(sig, frame):
             fuelShortage = 0
 
 
+
 def external():
     while True:
         r = random.randint(0, 10)
@@ -115,6 +122,7 @@ def external():
 
 
 def priceCalcul(price, temp):
+    mutex = Lock()
     global endWorld, trumpElection, fuelShortage
     a = 0.00003
     b1 = 0.05
@@ -123,7 +131,9 @@ def priceCalcul(price, temp):
     g = 0.99
     t = temp.value
     p = price.value
+    mutex.acquire()
     price.value = g * p + a * (t * t - 40 * t + 375) + b1 * endWorld + b2 * trumpElection + b3 * fuelShortage
+    mutex.release()
     print(f'Current price {price.value:.4f} €/kWh')
 
 
@@ -146,7 +156,7 @@ def weather(temp):
 
 
 def market(temp, price):
-    print(f'|          Initial price : {price} €/kWh           |')
+    print(f'|          Initial price : {initPrice} €/kWh           |')
     externalProcess = Process(target=external)
     externalProcess.start()
     signal.signal(signal.SIGUSR1, handler)
@@ -182,8 +192,8 @@ if __name__ == "__main__":
     labelPrice.config(font=('verdana', 12))
     labelPrice.pack()
 
-    keyMsg = 51
-    keyEng = 61
+    keyMsg = 115
+    keyEng = 215
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     #mqMsg = sysv_ipc.MessageQueue(keyMsg)
@@ -214,7 +224,6 @@ if __name__ == "__main__":
         price = sharedPrice.value
         labelPrice.config(text=f'\n\nCurrent price : \n\n{price:.4f} €/kWh')
         displayPrice.after(delay, update_price)
-
 
     update_temp()
     update_price()

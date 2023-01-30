@@ -15,13 +15,13 @@ import tkinter as tk
 
 
 serv = True
-PORT = 6966
+PORT = 6667
 stock = 0
 HOST = "localhost"
 endWorld, trumpElection, fuelShortage = 0, 0, 0
 initTemp = 18
 initPrice = 0.1740
-delay = 5000
+delay = 1000
 
 
 def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
@@ -35,7 +35,7 @@ def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
     while True:
         stockHome=stockManager(prodRate, consRate, stockHome);
         stockHome=tradePolicy(tradePol, stockHome, pid, mqMsg, mqEng)
-        time.sleep(2)
+        time.sleep(delay/1000)
         print(f'my pid is {pid} and my stock is {stockHome}')
 
 def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente si personne a qui donner
@@ -207,7 +207,7 @@ def external():
                 os.kill(os.getppid(), sig)
             case other:
                 print("--------------------------------------------------")
-        time.sleep(5)
+        time.sleep(delay/1000)
 
 def weather(temp):
     print(f'|          Initial temperature : {temp.value} °C           |')
@@ -222,7 +222,7 @@ def weather(temp):
                 if temp.value < 35:
                     temp.value += r
         print(f'Current temperature : {temp.value} °C')
-        time.sleep(5)
+        time.sleep(delay/1000)
 
 def priceCalcul(price, temp):
     global endWorld, trumpElection, fuelShortage
@@ -264,7 +264,7 @@ def MarketTransaction(home_socket, address, mutex, price, temp):
                 purchase = f'{pid} {qty}'
                 home_socket.sendto(purchase.encode(), address)
             # else pour gestion d'erreur
-            print("stock is ",stock)
+            print("stock is ", stock)
             mutex.release()
 
 def handler(sig, frame):
@@ -293,7 +293,7 @@ def handler(sig, frame):
             fuelShortage = 0
 
 def market(mutex, temp, price):
-    print(f'|          Initial price : {price} €/kWh           |')
+    print(f'|          Initial price : {price.value:.4f} €/kWh           |')
     externalProcess = Process(target=external)
     externalProcess.start()
     signal.signal(signal.SIGUSR1, handler)
@@ -366,8 +366,8 @@ if __name__ == "__main__":
     temp = initTemp
     price = initPrice
     mutex = threading.Lock()
-    keyMsg = 113
-    keyEng = 213
+    keyMsg = 119
+    keyEng = 219
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
     #mqMsg = sysv_ipc.MessageQueue(keyMsg)
@@ -376,11 +376,15 @@ if __name__ == "__main__":
     home2 = Process(target=home, args=(10, 1, keyMsg, keyEng, 1, 1))
     home3 = Process(target=home, args=(13, 1, keyMsg, keyEng, 2, 1))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
+    marketProcess = Process(target=market, args=(mutex, sharedTemp, sharedPrice,))
     weatherProcess.start()
+    marketProcess.start()
     home1.start()
     home2.start()
     home3.start()
-    market(mutex,sharedTemp,sharedPrice)
+
+
+    #market(mutex, sharedTemp, sharedPrice)
 
     def update_temp():
         temp = sharedTemp.value
@@ -407,5 +411,6 @@ if __name__ == "__main__":
     home2.join()
     home3.join()
     weatherProcess.join()
+    marketProcess.join()
     mqMsg.remove()
     mqEng.remove()
