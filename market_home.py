@@ -5,23 +5,24 @@ import select
 import signal
 import socket
 import sysv_ipc
-import threading
 import time
 import tkinter as tk
-from multiprocessing import Process, Value, Lock
+from threading import Lock
+from multiprocessing import Process, Value
 
-serv = True
-PORT = 7607
-initStock = 3
+
+PORT = 6666
 HOST = "localhost"
 worldWar, trumpElection, fuelShortage = 0, 0, 0
+initStock = 15
 initTemp = 18
 initPrice = 0.1740
 delay = 1000
+threshold = 30
+
 
 def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
     global PORT
-    global serv
     stockHome = s
     pid = os.getpid()
     print(f'my pid is {pid} and my stock is {stockHome}')
@@ -31,7 +32,6 @@ def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
         stockHome=stockManager(prodRate, consRate, stockHome);
         stockHome=tradePolicy(tradePol, stockHome, pid, mqMsg, mqEng)
         time.sleep(delay/1000)
-        #print(f'my pid is {pid} and my stock is {stockHome}')
 def stockManager(prodRate, consRate, stockHome):
     stockHome += prodRate
     stockHome -= consRate
@@ -39,21 +39,17 @@ def stockManager(prodRate, consRate, stockHome):
 
 
 def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente si personne a qui donner
-    if stockHome>10:
+    if stockHome>threshold:
         match policy:
             case 1:
                 stockHome = donEnergie(stockHome, mqMsg, mqEng, pid)
-                print(f'my pid is {pid} and my new stock is {stockHome}')
             case 2:
                 typeTransac = 2 #surplus
                 stockHome=homeSelling(typeTransac, pid, stockHome)
-                print(f'my pid is {pid} and my new stock is {stockHome}')
             case 3:
                 stockHome=debarras(stockHome, mqMsg, mqEng, pid)
-                print(f'my pid is {pid} and my new stock is {stockHome}')
-    elif stockHome<10 :
+    elif stockHome<threshold :
         stockHome=homeRestock(stockHome, pid, mqMsg, mqEng)
-        print(f'my pid is {pid} and my new stock is {stockHome}')
     else:
         pass
     return stockHome
@@ -62,79 +58,72 @@ def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente s
 def donEnergie(stockHome, mqMsg, mqEng, pid):
     pidH=0
     try:
-        #print("hello")
         m, pidH = mqMsg.receive(block=False)
         need = int(m.decode())
-        #print(f'{pidH} needs {need} \n')
-        if (stockHome - need >= 10):
+        if (stockHome - need >= threshold):
             send = str(need).encode()
             stockHome -= need
         else:
-            send = str(stockHome - 10).encode()
-            stockHome = 10
+            send = str(stockHome - threshold).encode()
+            stockHome = threshold
         mqEng.send(send, type=pidH)
-        #print("hello")
-        print(f'{pid} is sending {send.decode()} to {pidH} \n')
+        print(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh')
     except sysv_ipc.BusyError:
-        print("personne ne veut mon energie, miskina")
         pass
     return stockHome
 def homeSelling(typeTransac, pid, stockHome):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as home_socket:
         home_socket.connect((HOST, PORT))
-        m = f"{typeTransac} {pid} {abs(10-stockHome)}"  #type,PID,qty
+        m = f"{typeTransac} {pid} {abs(threshold-stockHome)}"  #type,PID,qty
         home_socket.sendall(m.encode())
         purchase = home_socket.recv(1024)
         purchase = purchase.decode().split()
         stockHome -= int(purchase[1])
-        print(f'{pid} : sending {purchase[1]} to the market')
-        print(f'{pid} my new stock is {stockHome}')
+        print(f'{pid} is sending {purchase[1]} to the market, my new stock is {stockHome}')
     return stockHome
 def debarras(stockHome, mqMsg, mqEng, pid):
     pidH=0
-    try :
+    try:
         m, pidH = mqMsg.receive(block=False)
         need = int(m.decode())
         #print(f'{pidH} needs {need} \n')
-        if (stockHome - need >= 10):
+        if (stockHome - need >= threshold):
             send = str(need).encode()
             stockHome -= need
         else:
-            send = str(stockHome - 10).encode()
-            stockHome = 10
+            send = str(stockHome - threshold).encode()
+            stockHome = threshold
         mqEng.send(send, type=pidH)
-        print(f'{pid} is sending {send.decode()} to {pidH} \n')
-    except sysv_ipc.QueueEmptyError:
+        print(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh')
+    except sysv_ipc.BusyError:
         typeTransac=1
         stockHome=homeSelling(typeTransac, pid, stockHome)
     return stockHome
 
 
 def homeRestock (stockHome, pid, mqMsg, mqEng): #envoi dans mqMsg pk besoin si qqun a à donner : reponse si pas de réponse dans mqEnd : achat
-    m = (str(10 - stockHome)).encode()
+    m = (str(threshold - stockHome)).encode()
     mqMsg.send(m, type=pid)
     try:
-        eng, t = mqEng.receive(block=False,type=pid)
+        eng, t = mqEng.receive(block=False, type=pid)
         eng = int(eng.decode())
-        #print(f'{pid} receiving {eng} \n')
         stockHome += eng
     except sysv_ipc.BusyError:
-        #print("hello3\n")
-        typeTransac=1
-        print("j'achete")
-        stockHome=homeBuying(typeTransac, pid, stockHome)
+        typeTransac = 1
+        stockHome = homeBuying(typeTransac, pid, stockHome)
     return stockHome
+
+
 def homeBuying(typeTransac, pid, stockHome):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as home_socket:
         home_socket.connect((HOST, PORT))
-        m = f"{typeTransac} {pid} {abs(10-stockHome)}"  #type,PID,qty
+        m = f"{typeTransac} {pid} {abs(threshold-stockHome)}"  #type,PID,qty
         home_socket.sendall(m.encode())
         purchase = home_socket.recv(1024)
         purchase = purchase.decode().split()
         if int(purchase[1]) != 0:
             stockHome += int(purchase[1])
-            print(f'{pid} : receiving {purchase[1]} from the market')
-            print(f'{pid} my new stock is {stockHome}')
+            print(f'{pid} : receiving {purchase[1]} from the market, my new stock is {stockHome}')
     return stockHome
 
 
@@ -151,34 +140,40 @@ def external():
                 sig = signal.SIGALRM
                 os.kill(os.getppid(), sig)
             case other:
-                print("--------------------------------------------------")
+                pass
         time.sleep(delay/1000)
 def handler(sig, frame):
     global worldWar, trumpElection, fuelShortage
     if sig == signal.SIGUSR1:
         if worldWar == 0:
+            print("--------------------------------------------------")
             print("World war")
             print("--------------------------------------------------")
             worldWar = 1
         else:
+            print("--------------------------------------------------")
             print("End of world war")
             print("--------------------------------------------------")
             worldWar = 0
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
+            print("--------------------------------------------------")
             print("Start of Trump election")
             print("--------------------------------------------------")
             trumpElection = 1
         else:
+            print("--------------------------------------------------")
             print("End of Trump election")
             print("--------------------------------------------------")
             trumpElection = 0
     elif sig == signal.SIGALRM:
         if fuelShortage == 0:
+            print("--------------------------------------------------")
             print("Start of fuel shortage")
             print("--------------------------------------------------")
             fuelShortage = 1
         else:
+            print("--------------------------------------------------")
             print("End of fuel shortage")
             print("--------------------------------------------------")
             fuelShortage = 0
@@ -190,11 +185,14 @@ def handlerC(sig, frame):
     displayMarket.destroy()
     displayTemp.destroy()
 
+
+
+
 def weather(temp):
-    print(f'|          Initial temperature : {temp.value} °C           |')
-    print("¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯")
+    mutex = Lock()
     while True:
         r = random.randint(-1, 1)
+        mutex.acquire()
         match r:
             case -1:
                 if temp.value > 0:
@@ -202,7 +200,7 @@ def weather(temp):
             case 1:
                 if temp.value < 35:
                     temp.value += r
-        #print(f'Current temperature : {temp.value} °C')
+        mutex.release()
         time.sleep(delay/1000)
 def priceCalcul(price, temp):
     mutex = Lock()
@@ -215,17 +213,11 @@ def priceCalcul(price, temp):
     t = temp.value
     p = price.value
     mutex.acquire()
-    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * worldWar + b2 * trumpElection + b3 * fuelShortage
+    price.value = g * p + a * (t * t - 40 * t + 375) #+ b1 * worldWar + b2 * trumpElection + b3 * fuelShortage
     mutex.release()
-    #print(f'Current price {price.value:.4f} €/kWh')
-
-    #externalProcess = Process(target=external)
-    #externalProcess.start()
-    #externalProcess.join()
 
 
-def market(mutex, temp, price, stock):
-    print(f'|          Initial price : {price.value:.4f} €/kWh           |')
+def market(temp, price, stock):
     externalProcess = Process(target=external)
     externalProcess.start()
     signal.signal(signal.SIGUSR1, handler)
@@ -237,22 +229,20 @@ def market(mutex, temp, price, stock):
         market_socket.bind((HOST, PORT))
         market_socket.listen(8)
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            while serv:
+            while True:
                 priceCalcul(price, temp)
                 readable, writable, error = select.select([market_socket], [], [], 1)
                 if market_socket in readable:
                     home_socket, address = market_socket.accept()
-                    executor.submit(MarketTransaction, home_socket, address, mutex, price, temp, stock)
+                    executor.submit(MarketTransaction, home_socket, address, stock)
     externalProcess.join()
-def MarketTransaction(home_socket, address, mutex, stock):
+def MarketTransaction(home_socket, address, stock):
+    mutex = Lock()
     with home_socket:
-        #print(f'Connected to home: {address}')
         data = home_socket.recv(1024)
         if not data:
-            #priceCalcul(price, temp)
             print("No data received from the client")
         else:
-            print("Data received:", data.decode())
             data = data.decode().split()
             [typeTransac, pid, qty] = data
             qty = int(qty)
@@ -270,14 +260,13 @@ def MarketTransaction(home_socket, address, mutex, stock):
                 stock.value += qty
                 purchase = f'{pid} {qty}'
                 home_socket.sendto(purchase.encode(), address)
-            # else pour gestion d'erreur
-            print("stock is ", stock.value)
+            else:
+                pass
             mutex.release()
 
 
 
 if __name__ == "__main__":
-    print("__________________________________________________")
 
     signal.signal(signal.SIGINT, handlerC)
 
@@ -306,28 +295,27 @@ if __name__ == "__main__":
     sharedPrice = Value('f', initPrice)
     temp = initTemp
     price = initPrice
-    mutex = threading.Lock()
+
     keyMsg = 170
     keyEng = 270
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
-    #mqMsg = sysv_ipc.MessageQueue(keyMsg)
-    #mqEng = sysv_ipc.MessageQueue(keyEng)
-    home1 = Process(target=home, args=(7, 2, keyMsg, keyEng, 1, 1))
-    home2 = Process(target=home, args=(10, 2, keyMsg, keyEng, 2, 1))
-    home3 = Process(target=home, args=(10, 1, keyMsg, keyEng, 1, 1))
+
+    home1 = Process(target=home, args=(35, 1, keyMsg, keyEng, 1, 2))
+    home2 = Process(target=home, args=(28, 2, keyMsg, keyEng, 1, 1))
+    home3 = Process(target=home, args=(32, 3, keyMsg, keyEng, 2, 1))
+    home4 = Process(target=home, args=(29, 1, keyMsg, keyEng, 1, 3,))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
-    marketProcess = Process(target=market, args=(mutex, sharedTemp, sharedPrice, sharedStock,))
+    marketProcess = Process(target=market, args=(sharedTemp, sharedPrice, sharedStock,))
+
     weatherProcess.start()
     marketProcess.start()
-    time.sleep(0.5)
+    time.sleep(0.2)
 
     home1.start()
     home2.start()
     home3.start()
-
-
-    #market(mutex, sharedTemp, sharedPrice)
+    home4.start()
 
     def update_temp():
         temp = sharedTemp.value
@@ -339,7 +327,6 @@ if __name__ == "__main__":
         else:
             labelTemp.config(fg="green")
         displayTemp.after(delay, update_temp)
-
     def update_price():
         stock = sharedStock.value
         price = sharedPrice.value
@@ -354,7 +341,6 @@ if __name__ == "__main__":
     home1.join()
     home2.join()
     home3.join()
+    home4.join()
     weatherProcess.join()
     marketProcess.join()
-    mqMsg.remove()
-    mqEng.remove()
