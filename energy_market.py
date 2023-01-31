@@ -89,7 +89,6 @@ def debarras(stockHome, mqMsg, mqEng, pid):
     try:
         m, pidH = mqMsg.receive(block=False)
         need = int(m.decode())
-        #print(f'{pidH} needs {need} \n')
         if (stockHome - need >= threshold):
             send = str(need).encode()
             stockHome -= need
