@@ -24,7 +24,7 @@ delay = 1000
 threshold = 30
 
 
-def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
+def home(s, tradePol, keyMsg, keyEng, temp, prodRate, consRate):
     global PORT
     stockHome = s
     pid = os.getpid()
@@ -32,7 +32,15 @@ def home(s, tradePol, keyMsg, keyEng, prodRate, consRate):
     mqMsg = sysv_ipc.MessageQueue(keyMsg)
     mqEng = sysv_ipc.MessageQueue(keyEng)
     while True:
-        stockHome=stockManager(prodRate, consRate, stockHome)
+        if temp.value <= 10: #if it's too cold then homes consume more (heating)
+            consFactor = 1
+        else:
+            consFactor = 0
+        if temp.value >= 25: #if it's too warm then homes produce more (solar panels)
+            prodFactor = 1
+        else:
+            prodFactor = 0
+        stockHome=stockManager(prodRate+prodFactor, consRate+consFactor, stockHome)
         stockHome=tradePolicy(tradePol, stockHome, pid, mqMsg, mqEng)
         time.sleep(delay/1000)
 def stockManager(prodRate, consRate, stockHome):
@@ -232,9 +240,9 @@ def market(temp, price, stock):
                 readable, writable, error = select.select([market_socket], [], [], 1)
                 if market_socket in readable:
                     home_socket, address = market_socket.accept()
-                    executor.submit(MarketTransaction, home_socket, address, stock)
+                    executor.submit(marketTransaction, home_socket, address, stock)
     externalProcess.join()
-def MarketTransaction(home_socket, address, stock):
+def marketTransaction(home_socket, address, stock):
     mutex = Lock()
     with home_socket:
         data = home_socket.recv(1024)
@@ -301,9 +309,9 @@ if __name__ == "__main__":
 
 
     #setup of our processes
-    home1 = Process(target=home, args=(35, 1, keyMsg, keyEng, 1, 2,))
-    home2 = Process(target=home, args=(28, 2, keyMsg, keyEng, 1, 1,))
-    home3 = Process(target=home, args=(32, 3, keyMsg, keyEng, 2, 1,))
+    home1 = Process(target=home, args=(35, 1, keyMsg, keyEng, sharedTemp, 1, 2,))
+    home2 = Process(target=home, args=(28, 2, keyMsg, keyEng, sharedTemp, 1, 1,))
+    home3 = Process(target=home, args=(32, 3, keyMsg, keyEng, sharedTemp, 2, 1,))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
     marketProcess = Process(target=market, args=(sharedTemp, sharedPrice, sharedStock,))
 
