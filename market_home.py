@@ -1,22 +1,23 @@
 import concurrent.futures
 import os
+import math
 import random
 import select
 import signal
 import socket
 import sysv_ipc
 import time
-import math
 import tkinter as tk
 from threading import Lock
 from multiprocessing import Process, Value
+from termcolor import colored
 
 
 PORT = 6666
 HOST = "localhost"
 worldWar, trumpElection, fuelShortage = 0, 0, 0
 initStock = 15
-initTemp = 18.0
+initTemp = 0
 initPrice = 0.1740
 delay = 1000
 threshold = 30
@@ -40,7 +41,7 @@ def stockManager(prodRate, consRate, stockHome):
 
 
 def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente si personne a qui donner
-    if stockHome>threshold:
+    if stockHome > threshold:
         match policy:
             case 1:
                 stockHome = donEnergie(stockHome, mqMsg, mqEng, pid)
@@ -49,7 +50,7 @@ def tradePolicy(policy, stockHome, pid, mqMsg, mqEng):#1 don, 2 vente, 3 vente s
                 stockHome=homeSelling(typeTransac, pid, stockHome)
             case 3:
                 stockHome=debarras(stockHome, mqMsg, mqEng, pid)
-    elif stockHome<threshold :
+    elif stockHome < threshold :
         stockHome=homeRestock(stockHome, pid, mqMsg, mqEng)
     else:
         pass
@@ -68,7 +69,7 @@ def donEnergie(stockHome, mqMsg, mqEng, pid):
             send = str(stockHome - threshold).encode()
             stockHome = threshold
         mqEng.send(send, type=pidH)
-        print(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh')
+        print(colored(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh', "yellow"))
     except sysv_ipc.BusyError:
         pass
     return stockHome
@@ -80,7 +81,7 @@ def homeSelling(typeTransac, pid, stockHome):
         purchase = home_socket.recv(1024)
         purchase = purchase.decode().split()
         stockHome -= int(purchase[1])
-        print(f'{pid} is sending {purchase[1]} to the market, my new stock is {stockHome}')
+        print(colored(f'{pid} is sending {purchase[1]} to the market, my new stock is {stockHome}', "cyan"))
     return stockHome
 def debarras(stockHome, mqMsg, mqEng, pid):
     pidH=0
@@ -95,7 +96,7 @@ def debarras(stockHome, mqMsg, mqEng, pid):
             send = str(stockHome - threshold).encode()
             stockHome = threshold
         mqEng.send(send, type=pidH)
-        print(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh')
+        print(colored(f'{pid} is sending {send.decode()} to {pidH}, my new stock is {stockHome} kWh', "yellow"))
     except sysv_ipc.BusyError:
         typeTransac=1
         stockHome=homeSelling(typeTransac, pid, stockHome)
@@ -124,11 +125,12 @@ def homeBuying(typeTransac, pid, stockHome):
         purchase = purchase.decode().split()
         if int(purchase[1]) != 0:
             stockHome += int(purchase[1])
-            print(f'{pid} : receiving {purchase[1]} from the market, my new stock is {stockHome}')
+            print(colored(f'{pid} : receiving {purchase[1]} from the market, my new stock is {stockHome}', "cyan"))
     return stockHome
 
 
 def external():
+    time.sleep(5*delay/1000)
     while True:
         r = random.randint(0, 20)
         match r:
@@ -137,6 +139,7 @@ def external():
                 os.kill(os.getppid(), sig)
             case 1:
                 sig = signal.SIGUSR2
+                os.kill(os.getppid(), sig)
             case 2:
                 sig = signal.SIGALRM
                 os.kill(os.getppid(), sig)
@@ -148,34 +151,34 @@ def handler(sig, frame):
     if sig == signal.SIGUSR1:
         if worldWar == 0:
             print("--------------------------------------------------")
-            print("World war")
+            print(colored("World war", "red"))
             print("--------------------------------------------------")
             worldWar = 1
         else:
             print("--------------------------------------------------")
-            print("End of world war")
+            print(colored("End of world war", "green"))
             print("--------------------------------------------------")
             worldWar = 0
     elif sig == signal.SIGUSR2:
         if trumpElection == 0:
             print("--------------------------------------------------")
-            print("Start of Trump election")
+            print(colored("Start of Trump election", "red"))
             print("--------------------------------------------------")
             trumpElection = 1
         else:
             print("--------------------------------------------------")
-            print("End of Trump election")
+            print(colored("End of Trump election", "green"))
             print("--------------------------------------------------")
             trumpElection = 0
     elif sig == signal.SIGALRM:
         if fuelShortage == 0:
             print("--------------------------------------------------")
-            print("Start of fuel shortage")
+            print(colored("Start of fuel shortage", "red"))
             print("--------------------------------------------------")
             fuelShortage = 1
         else:
             print("--------------------------------------------------")
-            print("End of fuel shortage")
+            print(colored("End of fuel shortage", "green"))
             print("--------------------------------------------------")
             fuelShortage = 0
 
@@ -185,6 +188,7 @@ def handlerC(sig, frame):
     mqMsg.remove()
     displayMarket.destroy()
     displayTemp.destroy()
+    os.exit()
 
 
 
@@ -215,6 +219,7 @@ def priceCalcul(price, temp):
 
 
 def market(temp, price, stock):
+
     externalProcess = Process(target=external)
     externalProcess.start()
     signal.signal(signal.SIGUSR1, handler)
@@ -288,15 +293,15 @@ if __name__ == "__main__":
     labelMarket.config(font=('verdana', 12))
     labelMarket.pack()
 
-    keyMsg = 170
-    keyEng = 270
+    keyMsg = 105
+    keyEng = 205
     mqMsg = sysv_ipc.MessageQueue(keyMsg, sysv_ipc.IPC_CREX)
     mqEng = sysv_ipc.MessageQueue(keyEng, sysv_ipc.IPC_CREX)
 
     home1 = Process(target=home, args=(35, 1, keyMsg, keyEng, 1, 2))
     home2 = Process(target=home, args=(28, 2, keyMsg, keyEng, 1, 1))
     home3 = Process(target=home, args=(32, 3, keyMsg, keyEng, 2, 1))
-    home4 = Process(target=home, args=(29, 1, keyMsg, keyEng, 1, 3,))
+
     weatherProcess = Process(target=weather, args=(sharedTemp,))
     marketProcess = Process(target=market, args=(sharedTemp, sharedPrice, sharedStock,))
 
@@ -307,7 +312,6 @@ if __name__ == "__main__":
     home1.start()
     home2.start()
     home3.start()
-    home4.start()
 
     def update_temp():
         temp = sharedTemp.value
@@ -333,6 +337,5 @@ if __name__ == "__main__":
     home1.join()
     home2.join()
     home3.join()
-    home4.join()
     weatherProcess.join()
     marketProcess.join()
