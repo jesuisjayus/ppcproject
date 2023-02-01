@@ -287,7 +287,7 @@ if __name__ == "__main__":
     #temperature display
     displayTemp = tk.Tk()
     displayTemp.title("Temperature")
-    displayTemp.geometry('300x200+660+320')
+    displayTemp.geometry('300x200+660+300')
     labelTemp = tk.Label(displayTemp, text=f'\n\nInitial temperature : \n\n{temp:.1f} °C')
     labelTemp.config(font=('verdana', 12))
     labelTemp.pack()
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     #price and market stock display
     displayMarket = tk.Tk()
     displayMarket.title("Market")
-    displayMarket.geometry('300x200+960+320')
+    displayMarket.geometry('300x200+960+300')
     labelMarket = tk.Label(displayMarket, text=f'\nInitial price : \n\n{price:.4f} €/kWh\n\n Market Stock : {stock} kWh')
     labelMarket.config(font=('verdana', 12))
     labelMarket.pack()
