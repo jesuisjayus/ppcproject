@@ -16,8 +16,8 @@ from termcolor import colored
 
 PORT = 6666
 HOST = "localhost"
-worldWar, nucDisaster, fuelShortage = 0, 0, 0
-initStock = 15
+worldWar, techInov, fuelShortage = 0, 0, 0
+initStock = 0
 initTemp = 0
 initPrice = 0.1740
 delay = 1000
@@ -140,22 +140,22 @@ def homeBuying(typeTransac, pid, stockHome):
 def external():
     time.sleep(5*delay/1000) #to avoid external event a the beginning of the simulation
     while True:
-        r = random.randint(0, 20)
+        r = random.randint(0, 30)
         match r:
             case 0:
                 sig = signal.SIGUSR1
                 os.kill(os.getppid(), sig)
-            case 1:
+            case 1 | 2 | 3:
                 sig = signal.SIGUSR2
                 os.kill(os.getppid(), sig)
-            case 2:
+            case 4 | 5:
                 sig = signal.SIGALRM
                 os.kill(os.getppid(), sig)
             case other:
                 pass
         time.sleep(delay/1000)
 def handler(sig, frame):
-    global worldWar, nucDisaster, fuelShortage
+    global worldWar, techInov, fuelShortage
     if sig == signal.SIGUSR1:
         if worldWar == 0:
             print("--------------------------------------------------")
@@ -168,16 +168,16 @@ def handler(sig, frame):
             print("--------------------------------------------------")
             worldWar = 0
     elif sig == signal.SIGUSR2:
-        if nucDisaster == 0:
+        if techInov == 0:
             print("--------------------------------------------------")
-            print(colored("Start of nuclear disaster", "red"))
+            print(colored("New innovation discovered", "green"))
             print("--------------------------------------------------")
-            nucDisaster = 1
+            techInov = 1
         else:
             print("--------------------------------------------------")
-            print(colored("End of nuclear disaster", "green"))
+            print(colored("Fail of innovation", "red"))
             print("--------------------------------------------------")
-            nucDisaster = 0
+            techInov = 0
     elif sig == signal.SIGALRM:
         if fuelShortage == 0:
             print("--------------------------------------------------")
@@ -199,7 +199,7 @@ def handler(sig, frame):
 
 
 def weather(temp):
-    t = 0
+    t = 12 #start at 12am
     mutex = Lock()
     while True:
         mutex.acquire()
@@ -210,16 +210,18 @@ def weather(temp):
 
 def priceCalcul(price, temp):
     mutex = Lock()
-    global worldWar, nucDisaster, fuelShortage
+    global worldWar, techInov, fuelShortage
     a = 0.00003 #coef for contribution of temp
     b1 = 0.02 #coef for contribution of world war
-    b2 = 0.005 #coef for contribution of nuclear disaster
+    b2 = 0.02 #coef for contribution of innovation
     b3 = 0.005 #coef for contribution of fuel shortage
     g = 0.99 #attenuation coef
     t = temp.value
     p = price.value
     mutex.acquire()
-    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * worldWar + b2 * nucDisaster + b3 * fuelShortage #calcul of energy price according to temp and events
+    price.value = g * p + a * (t * t - 40 * t + 375) + b1 * worldWar - b2 * techInov + b3 * fuelShortage #calcul of energy price according to temp and events
+    if price.value < 0.05:
+        price.value = 0.05 #capitalist model : price limited to 5 cents minimum
     mutex.release()
 
 
@@ -287,7 +289,7 @@ if __name__ == "__main__":
     #temperature display
     displayTemp = tk.Tk()
     displayTemp.title("Temperature")
-    displayTemp.geometry('300x200+660+300')
+    displayTemp.geometry('300x200+660+280')
     labelTemp = tk.Label(displayTemp, text=f'\n\nInitial temperature : \n\n{temp:.1f} °C')
     labelTemp.config(font=('verdana', 12))
     labelTemp.pack()
@@ -295,7 +297,7 @@ if __name__ == "__main__":
     #price and market stock display
     displayMarket = tk.Tk()
     displayMarket.title("Market")
-    displayMarket.geometry('300x200+960+300')
+    displayMarket.geometry('300x200+960+280')
     labelMarket = tk.Label(displayMarket, text=f'\nInitial price : \n\n{price:.4f} €/kWh\n\n Market Stock : {stock} kWh')
     labelMarket.config(font=('verdana', 12))
     labelMarket.pack()
@@ -310,8 +312,8 @@ if __name__ == "__main__":
 
     #setup of our processes
     home1 = Process(target=home, args=(35, 1, keyMsg, keyEng, sharedTemp, 1, 2,))
-    home2 = Process(target=home, args=(28, 2, keyMsg, keyEng, sharedTemp, 1, 1,))
-    home3 = Process(target=home, args=(32, 3, keyMsg, keyEng, sharedTemp, 2, 1,))
+    home2 = Process(target=home, args=(28, 1, keyMsg, keyEng, sharedTemp, 1, 1,))
+    home3 = Process(target=home, args=(32, 1, keyMsg, keyEng, sharedTemp, 2, 1,))
     weatherProcess = Process(target=weather, args=(sharedTemp,))
     marketProcess = Process(target=market, args=(sharedTemp, sharedPrice, sharedStock,))
 
